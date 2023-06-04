@@ -5,6 +5,7 @@ import br.pucpr.authserver.security.Jwt
 import br.pucpr.authserver.users.requests.LoginRequest
 import br.pucpr.authserver.users.requests.UserRequest
 import br.pucpr.authserver.users.responses.LoginResponse
+import org.slf4j.LoggerFactory
 import org.springframework.data.domain.Sort
 import org.springframework.data.repository.findByIdOrNull
 import org.springframework.stereotype.Service
@@ -37,6 +38,7 @@ class UsersService(
     fun login(credentials: LoginRequest): LoginResponse? {
         val user = repository.findByEmail(credentials.email!!) ?: return null
         if (user.password != credentials.password) return null
+        log.info("User logged in. id={} name={}", user.id, user.name)
         return LoginResponse(
             token = jwt.createToken(user),
             user.toResponse()
@@ -49,7 +51,12 @@ class UsersService(
             val count = repository.findAllByRole("ADMIN").size
             if (count == 1)  throw BadRequestException("Cannot delete the last system admin!")
         }
+        log.warn("User deleted. id={} name={}", user.id, user.name)
         repository.delete(user)
         return true
+    }
+
+    companion object {
+        val log = LoggerFactory.getLogger(UsersService::class.java)
     }
 }
