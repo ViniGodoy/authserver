@@ -1,5 +1,6 @@
 package br.pucpr.authserver.users
 
+import br.pucpr.authserver.exception.BadRequestException
 import br.pucpr.authserver.security.Jwt
 import br.pucpr.authserver.users.requests.LoginRequest
 import br.pucpr.authserver.users.requests.UserRequest
@@ -46,7 +47,7 @@ class UsersService(
         val user = repository.findByIdOrNull(id) ?: return false
         if (user.roles.any { it.name == "ADMIN" }) {
             val count = repository.findAllByRole("ADMIN").size
-            if (count == 1) return false
+            if (count == 1)  throw BadRequestException("Cannot delete the last system admin!")
         }
         repository.delete(user)
         return true
