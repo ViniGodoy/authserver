@@ -16,7 +16,7 @@ import java.time.ZonedDateTime
 import java.util.*
 
 @Component
-class Jwt {
+class Jwt(val properties: SecurityProperties) {
     fun createToken(user: User) =
         UserToken(
             id = user.id ?: -1L,
@@ -24,11 +24,11 @@ class Jwt {
             roles = user.roles.map { it.name }.toSortedSet()
         ).let {
             Jwts.builder()
-                .signWith(Keys.hmacShaKeyFor(SECRET.toByteArray()))
+                .signWith(Keys.hmacShaKeyFor(properties.secret.toByteArray()))
                 .serializeToJsonWith(JacksonSerializer())
                 .setIssuedAt(utcNow().toDate())
-                .setExpiration(utcNow().plusHours(EXPIRE_HOURS).toDate())
-                .setIssuer(ISSUER)
+                .setExpiration(utcNow().plusHours(properties.expireHours).toDate())
+                .setIssuer(properties.issuer)
                 .setSubject(it.id.toString())
                 .addClaims(mapOf(USER_FIELD to it))
                 .compact()
@@ -40,7 +40,7 @@ class Jwt {
         val token = header.replace(PREFIX, "").trim()
 
         val claims = Jwts.parserBuilder()
-            .setSigningKey(SECRET.toByteArray())
+            .setSigningKey(properties.secret.toByteArray())
             .deserializeJsonWith(
                 JacksonDeserializer(
                     mapOf(USER_FIELD to UserToken::class.java)
@@ -49,7 +49,7 @@ class Jwt {
             .parseClaimsJws(token)
             .body
 
-        if (claims.issuer != ISSUER) return null
+        if (claims.issuer != properties.issuer) return null
         val user = claims.get(USER_FIELD, UserToken::class.java)
         val authorities = user.roles.map { SimpleGrantedAuthority("ROLE_$it") }
         return UsernamePasswordAuthenticationToken.authenticated(user, user.id, authorities)
@@ -57,10 +57,7 @@ class Jwt {
 
     companion object {
         private const val PREFIX = "Bearer"
-        private const val ISSUER = "Auth Server"
-        private const val SECRET = "owp.z;8BhLq(l?2HM(5)u<x)Hg!A[J:h"
         private const val USER_FIELD = "user"
-        private const val EXPIRE_HOURS = 24L
 
         private fun ZonedDateTime.toDate(): Date = Date.from(this.toInstant())
         private fun utcNow(): ZonedDateTime = ZonedDateTime.now(ZoneOffset.UTC)
