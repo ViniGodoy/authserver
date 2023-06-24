@@ -5,6 +5,7 @@ import io.swagger.v3.oas.annotations.security.SecurityScheme
 import jakarta.servlet.http.HttpServletResponse.SC_UNAUTHORIZED
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
+import org.springframework.context.annotation.PropertySource
 import org.springframework.http.HttpMethod
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity
 import org.springframework.security.config.annotation.web.builders.HttpSecurity
@@ -23,6 +24,7 @@ import org.springframework.web.filter.CorsFilter
     scheme = "bearer",
     bearerFormat = "JWT"
 )
+@PropertySource("classpath:/security.properties")
 class SecurityConfig(private val jwtTokenFilter: JwtTokenFilter) {
     @Bean
     fun filterChain(security: HttpSecurity): DefaultSecurityFilterChain =

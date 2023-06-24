@@ -6,6 +6,7 @@ import io.jsonwebtoken.jackson.io.JacksonDeserializer
 import io.jsonwebtoken.jackson.io.JacksonSerializer
 import io.jsonwebtoken.security.Keys
 import jakarta.servlet.http.HttpServletRequest
+import org.slf4j.LoggerFactory
 import org.springframework.http.HttpHeaders.AUTHORIZATION
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken
 import org.springframework.security.core.Authentication
@@ -17,7 +18,7 @@ import java.util.*
 
 @Component
 class Jwt(val properties: SecurityProperties) {
-    fun createToken(user: User) =
+    fun createToken(user: User): String =
         UserToken(
             id = user.id ?: -1L,
             name = user.name,
@@ -35,29 +36,35 @@ class Jwt(val properties: SecurityProperties) {
         }
 
     fun extract(req: HttpServletRequest): Authentication? {
-        val header = req.getHeader(AUTHORIZATION)
-        if (header == null || !header.startsWith(PREFIX)) return null
-        val token = header.replace(PREFIX, "").trim()
+        try {
+            val header = req.getHeader(AUTHORIZATION)
+            if (header == null || !header.startsWith(PREFIX)) return null
+            val token = header.replace(PREFIX, "").trim()
 
-        val claims = Jwts.parserBuilder()
-            .setSigningKey(properties.secret.toByteArray())
-            .deserializeJsonWith(
-                JacksonDeserializer(
-                    mapOf(USER_FIELD to UserToken::class.java)
-                )
-            ).build()
-            .parseClaimsJws(token)
-            .body
+            val claims = Jwts.parserBuilder()
+                .setSigningKey(properties.secret.toByteArray())
+                .deserializeJsonWith(
+                    JacksonDeserializer(
+                        mapOf(USER_FIELD to UserToken::class.java)
+                    )
+                ).build()
+                .parseClaimsJws(token)
+                .body
 
-        if (claims.issuer != properties.issuer) return null
-        val user = claims.get(USER_FIELD, UserToken::class.java)
-        val authorities = user.roles.map { SimpleGrantedAuthority("ROLE_$it") }
-        return UsernamePasswordAuthenticationToken.authenticated(user, user.id, authorities)
+            if (claims.issuer != properties.issuer) return null
+            val user = claims.get(USER_FIELD, UserToken::class.java)
+            val authorities = user.roles.map { SimpleGrantedAuthority("ROLE_$it") }
+            return UsernamePasswordAuthenticationToken.authenticated(user, user.id, authorities)
+        } catch (e: Throwable) {
+            log.debug("Token rejected", e)
+            return null
+        }
     }
 
     companion object {
         private const val PREFIX = "Bearer"
         private const val USER_FIELD = "user"
+        private val log = LoggerFactory.getLogger(Jwt::class.java)
 
         private fun ZonedDateTime.toDate(): Date = Date.from(this.toInstant())
         private fun utcNow(): ZonedDateTime = ZonedDateTime.now(ZoneOffset.UTC)
